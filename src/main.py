@@ -1,7 +1,7 @@
 # ===== Imports =====
 
 from os.path import dirname, abspath, isfile
-from paramiko import RSAKey, Transport, ServerInterface
+from paramiko import RSAKey, Transport, ServerInterface, Channel
 from paramiko.common import (
     AUTH_SUCCESSFUL,
     AUTH_FAILED,
@@ -24,6 +24,29 @@ with open(dataFolder + '/accounts.json', 'r') as accountsFile:
 
 # ===== Classes =====
 
+class ShellHandler:
+    def __init__(self, channel: Channel):
+        self.channel = channel
+        self.buffer = ""
+
+    def input_loop(self):
+        self.channel.send("$ ")
+        while True:
+            data = self.channel.recv(1024)
+            if not data:
+                break
+
+            for c in data.decode():
+                if c == '\r':
+                    print(f'Commande complete : {self.buffer}')
+                    self.buffer = ''
+                elif c == '\x7f':
+                    self.buffer = self.buffer[0:-1]
+                    self.channel.send('\b \b')
+                else:
+                    self.buffer += c
+                    self.channel.send(c)
+
 
 class MielpopsServer(ServerInterface):
     def check_auth_password(self, user, password):
@@ -32,10 +55,16 @@ class MielpopsServer(ServerInterface):
             return AUTH_SUCCESSFUL
         return AUTH_FAILED
 
-    def check_channel_request(self, kind, channelId):
+    def check_channel_request(self, kind, channel):
         if kind == 'session':
             return OPEN_SUCCEEDED
         return OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
+
+    def check_channel_pty_request(self, channel, term, width, height, pixelwidth, pixelheight, modes):
+        return True
+
+    def check_channel_shell_request(self, channel):
+        return True
 
 
 # ===== Functions =====
@@ -65,8 +94,11 @@ def main() -> None:
     server = MielpopsServer()
     transport.start_server(server=server)
     channel = transport.accept(30)
-    if channel is not None:
-        print('Channel ouvert')
+    if channel is None:
+        return
+
+    shell = ShellHandler(channel)
+    shell.input_loop()
 
 
 # ===== Execution =====
