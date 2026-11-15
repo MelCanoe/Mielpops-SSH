@@ -19,7 +19,9 @@ dataFolder = srcFolder + '/../data'
 
 with open(dataFolder + '/accounts.json', 'r') as accountsFile:
     accounts = load(accountsFile)
-    print(accounts)
+
+with open(dataFolder + '/filesystem.json', 'r') as fsFile:
+    fs = load(fsFile)
 
 
 # ===== Classes =====
@@ -28,9 +30,64 @@ class ShellHandler:
     def __init__(self, channel: Channel):
         self.channel = channel
         self.buffer = ""
+        self.pwd = "/home/user1"
+
+    def get_folder_from_path(self, path: str):
+        if path == "/":
+            return fs['/']
+        try:
+            splittedPath = path.split('/')
+            folderContent = fs['/']
+            for x in splittedPath[1:]:
+                folderContent = folderContent[x]
+            return folderContent
+        except KeyError:
+            return False
+
+    def handle_command(self, command: list[str]):
+        self.channel.send("\r\n")
+        if command[0] == 'ls':
+            if len(command) == 1:
+                path = self.pwd
+            elif command[1].startswith('/'):
+                path = command[1]
+            else:
+                path = self.pwd.rstrip('/') + '/' + command[1]
+
+            content = self.get_folder_from_path(path)
+            if content is False:
+                self.channel.send(f"ls: cannot access '{command[1]}': No such file or directory\r\n")
+            elif content is None:
+                self.channel.send(f"{command[1]}\r\n")
+            else:
+                for item in content:
+                    self.channel.send(f'{item} ')
+                self.channel.send("\r\n")
+        elif command[0] == 'cd':
+            if len(command) == 1:
+                self.pwd = "/home/user1"
+            else:
+                path = command[1]
+                if path == '..':
+                    self.pwd = '/'.join(self.pwd.split('/')[:-1]) or '/'
+                elif path.startswith('/'):
+                    if self.get_folder_from_path(path) is not False:
+                        self.pwd = path
+                else:
+                    fullPath = self.pwd.rstrip('/') + '/' + path
+                    if self.get_folder_from_path(fullPath) is not False:
+                        self.pwd = fullPath
+        elif command[0] == 'whoami':
+            self.channel.send("user1\r\n")
+        elif command[0] == 'pwd':
+            self.channel.send(self.pwd + '\r\n')
+        else:
+            self.channel.send(
+                f"bash: {''.join(command)}: command not found\r\n"
+            )
 
     def input_loop(self):
-        self.channel.send("$ ")
+        self.channel.send("$ ") 
         while True:
             data = self.channel.recv(1024)
             if not data:
@@ -38,11 +95,13 @@ class ShellHandler:
 
             for c in data.decode():
                 if c == '\r':
-                    print(f'Commande complete : {self.buffer}')
+                    self.handle_command(self.buffer.split(' '))
                     self.buffer = ''
+                    self.channel.send("$ ")
                 elif c == '\x7f':
-                    self.buffer = self.buffer[0:-1]
-                    self.channel.send('\b \b')
+                    if len(self.buffer) > 0:
+                        self.buffer = self.buffer[0:-1]
+                        self.channel.send('\b \b')
                 else:
                     self.buffer += c
                     self.channel.send(c)

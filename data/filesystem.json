@@ -1,0 +1,29 @@
+{
+    "/": {
+        "bin": {},
+        "etc": {
+            "passwd": null,
+            "hostname": null,
+            "shadow": null
+        },
+        "home": {
+            "user1": {
+                ".bashrc": null,
+                ".ssh": {
+                    "authorized_keys": null
+                },
+                "Documents": {},
+                "Downloads": {}
+            }
+        },
+        "root": {
+            ".bashrc": null
+        },
+        "tmp": {},
+        "var": {
+            "log": {
+                "syslog": null
+            }
+        }
+    }
+}
