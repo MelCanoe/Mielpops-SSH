@@ -1,0 +1,14 @@
+{
+    "127.0.0.1": {
+        "commands": {
+            "1794847527": "ls"
+        },
+        "auth": {
+            "1794847525": {
+                "user": "admin",
+                "pass": "admin",
+                "status": "success"
+            }
+        }
+    }
+}

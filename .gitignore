@@ -1,0 +1,4 @@
+data/key
+data/history.json
+.venv/
+__pycache__/

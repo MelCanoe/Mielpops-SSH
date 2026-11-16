@@ -8,7 +8,8 @@ from paramiko.common import (
     OPEN_SUCCEEDED,
     OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
 )
-from json import load
+from json import load, dump
+from time import time
 import socket
 
 
@@ -26,9 +27,34 @@ with open(dataFolder + '/filesystem.json', 'r') as fsFile:
 
 # ===== Classes =====
 
+class History:
+    def __init__(self):
+        if isfile(dataFolder + '/history.json'):
+            with open(dataFolder + '/history.json', 'r') as historyFile:
+                self.history = load(historyFile)
+        else:
+            self.history = {}
+
+    def log(self, ip: str, data: str|tuple[str], kind: str):
+        if ip not in self.history.keys():
+            self.history[ip] = {
+                "commands": {},
+                "auth": {}
+            }
+        timestamp = str(int(time()))
+        self.history[ip][kind][timestamp] = data
+        self.save()
+
+    def save(self):
+        with open(dataFolder + '/history.json', 'w+') as historyFile:
+            dump(self.history, historyFile, indent=4)
+
+
 class ShellHandler:
-    def __init__(self, channel: Channel):
+    def __init__(self, channel: Channel, history: History, clientAddr):
         self.channel = channel
+        self.history = history
+        self.clientAddr = clientAddr
         self.buffer = ""
         self.pwd = "/home/user1"
 
@@ -87,7 +113,7 @@ class ShellHandler:
             )
 
     def input_loop(self):
-        self.channel.send("$ ") 
+        self.channel.send("$ ")
         while True:
             data = self.channel.recv(1024)
             if not data:
@@ -96,6 +122,8 @@ class ShellHandler:
             for c in data.decode():
                 if c == '\r':
                     self.handle_command(self.buffer.split(' '))
+                    if self.buffer.strip():
+                        self.history.log(self.clientAddr[0], self.buffer, "commands")
                     self.buffer = ''
                     self.channel.send("$ ")
                 elif c == '\x7f':
@@ -108,10 +136,31 @@ class ShellHandler:
 
 
 class MielpopsServer(ServerInterface):
+    def __init__(self, history: History, clientAddr):
+        self.history = history
+        self.clientAddr = clientAddr
+
     def check_auth_password(self, user, password):
-        print(f'Tentative : {user}:{password}')
         if user in accounts.keys() and password == accounts[user]:
+            self.history.log(
+                self.clientAddr[0],
+                {
+                    "user": user,
+                    "pass": password,
+                    "status": "success"
+                },
+                "auth"
+            )
             return AUTH_SUCCESSFUL
+        self.history.log(
+            self.clientAddr[0],
+            {
+                "user": user,
+                "pass": password,
+                "status": "failed"
+            },
+            "auth"
+        )
         return AUTH_FAILED
 
     def check_channel_request(self, kind, channel):
@@ -119,7 +168,11 @@ class MielpopsServer(ServerInterface):
             return OPEN_SUCCEEDED
         return OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
 
-    def check_channel_pty_request(self, channel, term, width, height, pixelwidth, pixelheight, modes):
+    def check_channel_pty_request(
+        self,
+        channel, term, width, height,
+        pixelwidth, pixelheight, modes
+    ):
         return True
 
     def check_channel_shell_request(self, channel):
@@ -139,6 +192,8 @@ def get_key() -> RSAKey:
 
 
 def main() -> None:
+    serverLogs = History()
+
     serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     serverSocket.bind(('127.0.0.1', 2222))
     serverSocket.listen()
@@ -150,13 +205,13 @@ def main() -> None:
     transport = Transport(clientSocket)
     transport.add_server_key(serverKey)
 
-    server = MielpopsServer()
+    server = MielpopsServer(serverLogs, clientAddr)
     transport.start_server(server=server)
     channel = transport.accept(30)
     if channel is None:
         return
 
-    shell = ShellHandler(channel)
+    shell = ShellHandler(channel, serverLogs, clientAddr)
     shell.input_loop()
 
 
