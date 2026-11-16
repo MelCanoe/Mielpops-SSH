@@ -1,7 +1,7 @@
 ## Claude 14/11 :
 
 Demande : Génère moi une arborescence crédible
-
+Commit : 509b24b20fb7674ac0b180043306ff7d4ede239f
 Gardé :
 ``` json
 {
@@ -38,7 +38,7 @@ Gardé :
 ## Claude 14/11 :
 
 Demande : Aide moi sur le tout début, c'est quoi les fonctions / méthodes qu'il faut pour faire le serveur.
-
+Commit : ce7423f7f09cf773414ab61be5ea0720d9cc19d3
 Gardé :
 
 ``` python
@@ -53,7 +53,7 @@ channel = transport.accept(30)
 ## Claude 14/11 :
 
 Demande : Tu peux m'aider avec la structure de la classe de mon serveur. J'aimerai voir à quoi ça ressemble.
-
+Commit : 0054c539dcc9a06f5c12081d4c2b3a27942eaffc
 Gardé :
 
 ``` python
@@ -85,7 +85,7 @@ class HoneypotServer(ServerInterface):
 ## Claude 16/11 :
 
 Demande : Aide moi à faire le README.md
-
+Commit : 4a62c6a39f86e684093f79a4df2b69fafc9376e5
 Gardé :
 
 # MielpopsSSH
@@ -230,7 +230,7 @@ This tool is intended for **educational purposes only** as part of a cybersecuri
 ## Claude 16/11
 
 Demande : Comment faire un signal pour les interruptions claviers (ctrl + d) dans le main.py.
-
+Commit : 644407a292259386a71f7a72b1d40edea4c7d49b
 Gardé :
 ``` python
     try:
@@ -257,5 +257,5 @@ elif c == '\x04':
 ## Claude 16//11
 
 Demande : L'interruption ne fonctionne pas
-
+Commit : 644407a292259386a71f7a72b1d40edea4c7d49b
 Gardé : Applique un timeout sur les socket accept avec "serverSocket.settimeout(1)" pour couper l'attente et savoir si une interruption est demandée.
