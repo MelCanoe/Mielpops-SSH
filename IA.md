@@ -35,6 +35,53 @@ Gardé :
 }
 ```
 
+## Claude 14/11 :
+
+Demande : Aide moi sur le tout début, c'est quoi les fonctions / méthodes qu'il faut pour faire le serveur.
+
+Gardé :
+
+``` python
+transport = paramiko.Transport(client_socket)
+host_key = paramiko.RSAKey.generate(2048)
+transport.add_server_key(host_key)
+server = TonServerInterface()
+transport.start_server(server=server)
+channel = transport.accept(30)
+```
+
+## Claude 14/11 :
+
+Demande : Tu peux m'aider avec la structure de la classe de mon serveur. J'aimerai voir à quoi ça ressemble.
+
+Gardé :
+
+``` python
+from paramiko import ServerInterface, AUTH_SUCCESSFUL, OPEN_SUCCEEDED
+
+class HoneypotServer(ServerInterface):
+
+    def check_auth_password(self, username, password):
+        # Appelée quand le client essaie un user/pass
+        # Tu return AUTH_SUCCESSFUL ou AUTH_FAILED
+        return AUTH_SUCCESSFUL
+
+    def check_channel_request(self, kind, chanid):
+        # Appelée quand le client veut ouvrir un canal
+        if kind == "session":
+            return OPEN_SUCCEEDED
+        return OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
+
+    def check_channel_shell_request(self, channel):
+        # Appelée quand le client demande un shell
+        return True
+
+    def check_channel_pty_request(self, channel, term, width, height,
+                                  pixelwidth, pixelheight, modes):
+        # Appelée quand le client demande un pseudo-terminal
+        return True
+```
+
 ## Claude 16/11 :
 
 Demande : Aide moi à faire le README.md
