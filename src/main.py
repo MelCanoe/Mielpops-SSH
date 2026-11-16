@@ -16,6 +16,10 @@ import socket
 
 # ===== Variables =====
 
+host = "127.0.0.1"
+port = 2222
+
+
 srcFolder = dirname(abspath(__file__))
 dataFolder = srcFolder + '/../data'
 
@@ -54,6 +58,7 @@ class History:
 class ShellHandler:
     def __init__(self, channel: Channel, history: History, clientAddr):
         self.channel = channel
+        self.closed = False
         self.history = history
         self.clientAddr = clientAddr
         self.buffer = ""
@@ -108,36 +113,47 @@ class ShellHandler:
             self.channel.send("user1\r\n")
         elif command[0] == 'pwd':
             self.channel.send(self.pwd + '\r\n')
+        elif command[0] == 'exit':
+            self.closed = True
+            self.channel.close()
+            return
         else:
             self.channel.send(
                 f"bash: {''.join(command)}: command not found\r\n"
             )
 
     def input_loop(self):
-        self.channel.send("$ ")
-        while True:
-            data = self.channel.recv(1024)
-            if not data:
-                break
+        if not self.closed:
+            self.channel.send("$ ")
+            while True:
+                data = self.channel.recv(1024)
+                if not data:
+                    break
 
-            for c in data.decode():
-                if c == '\r':
-                    self.handle_command(self.buffer.split(' '))
-                    if self.buffer.strip():
-                        self.history.log(
-                            self.clientAddr[0],
-                            self.buffer,
-                            "commands"
-                        )
-                    self.buffer = ''
-                    self.channel.send("$ ")
-                elif c == '\x7f':
-                    if len(self.buffer) > 0:
-                        self.buffer = self.buffer[0:-1]
-                        self.channel.send('\b \b')
-                else:
-                    self.buffer += c
-                    self.channel.send(c)
+                for c in data.decode():
+                    if c == '\r':
+                        self.handle_command(self.buffer.split(' '))
+                        if self.closed:
+                            break
+                        if self.buffer.strip():
+                            self.history.log(
+                                self.clientAddr[0],
+                                self.buffer,
+                                "commands"
+                            )
+                        self.buffer = ''
+                        self.channel.send("$ ")
+                    elif c == '\x7f':
+                        if len(self.buffer) > 0:
+                            self.buffer = self.buffer[0:-1]
+                            self.channel.send('\b \b')
+                    elif c == '\x04':
+                        self.closed = True
+                        self.channel.close()
+                        return
+                    else:
+                        self.buffer += c
+                        self.channel.send(c)
 
 
 class MielpopsServer(ServerInterface):
@@ -219,17 +235,29 @@ def main() -> None:
     serverLogs = History()
 
     serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    serverSocket.bind(('127.0.0.1', 2222))
+    serverSocket.bind((host, port))
     serverSocket.listen()
 
-    while True:
-        clientSocket, clientAddr = serverSocket.accept()
-        newThread = threading.Thread(
-            target=handle_client,
-            args=(clientSocket, clientAddr, serverLogs),
-            daemon=True
-        )
-        newThread.start()
+    serverSocket.settimeout(1)
+
+    print(f"\n[+] Listening on {host}:{port}")
+
+    try:
+        while True:
+            try:
+                clientSocket, clientAddr = serverSocket.accept()
+            except socket.timeout:
+                continue
+            newThread = threading.Thread(
+                target=handle_client,
+                args=(clientSocket, clientAddr, serverLogs),
+                daemon=True
+            )
+            newThread.start()
+    except KeyboardInterrupt:
+        print("[!] Stopping server.")
+    finally:
+        serverSocket.close()
 
 
 # ===== Execution =====

@@ -179,3 +179,36 @@ Rejeté :
 ## Disclaimer
  
 This tool is intended for **educational purposes only** as part of a cybersecurity school project. Only deploy honeypots on networks you own or have explicit permission to monitor.
+
+## Claude 16/11
+
+Demande : Comment faire un signal pour les interruptions claviers (ctrl + d) dans le main.py.
+
+Gardé :
+``` python
+    try:
+        while True:
+            clientSocket, clientAddr = serverSocket.accept()
+            newThread = threading.Thread(
+                target=handle_client,
+                args=(clientSocket, clientAddr, serverLogs),
+                daemon=True
+            )
+            newThread.start()
+    except KeyboardInterrupt:
+        print("\n[!] Arrêt du serveur.")
+    finally:
+        serverSocket.close()
+```
+
+``` python
+elif c == '\x04':
+    self.channel.close()
+    return
+```
+
+## Claude 16//11
+
+Demande : L'interruption ne fonctionne pas
+
+Gardé : Applique un timeout sur les socket accept avec "serverSocket.settimeout(1)" pour couper l'attente et savoir si une interruption est demandée.
