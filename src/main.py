@@ -10,6 +10,7 @@ from paramiko.common import (
 )
 from json import load, dump
 from time import time
+import threading
 import socket
 
 
@@ -35,7 +36,7 @@ class History:
         else:
             self.history = {}
 
-    def log(self, ip: str, data: str|tuple[str], kind: str):
+    def log(self, ip: str, data: str | tuple[str], kind: str):
         if ip not in self.history.keys():
             self.history[ip] = {
                 "commands": {},
@@ -123,7 +124,11 @@ class ShellHandler:
                 if c == '\r':
                     self.handle_command(self.buffer.split(' '))
                     if self.buffer.strip():
-                        self.history.log(self.clientAddr[0], self.buffer, "commands")
+                        self.history.log(
+                            self.clientAddr[0],
+                            self.buffer,
+                            "commands"
+                        )
                     self.buffer = ''
                     self.channel.send("$ ")
                 elif c == '\x7f':
@@ -181,6 +186,25 @@ class MielpopsServer(ServerInterface):
 
 # ===== Functions =====
 
+def handle_client(
+    clientSocket,
+    clientAddr,
+    serverLogs: History
+):
+    serverKey = get_key()
+
+    transport = Transport(clientSocket)
+    transport.add_server_key(serverKey)
+
+    server = MielpopsServer(serverLogs, clientAddr)
+    transport.start_server(server=server)
+    channel = transport.accept(30)
+    if channel is None:
+        return
+
+    shell = ShellHandler(channel, serverLogs, clientAddr)
+    shell.input_loop()
+
 
 def get_key() -> RSAKey:
     if not isfile(dataFolder + '/key'):
@@ -198,21 +222,14 @@ def main() -> None:
     serverSocket.bind(('127.0.0.1', 2222))
     serverSocket.listen()
 
-    clientSocket, clientAddr = serverSocket.accept()
-
-    serverKey = get_key()
-
-    transport = Transport(clientSocket)
-    transport.add_server_key(serverKey)
-
-    server = MielpopsServer(serverLogs, clientAddr)
-    transport.start_server(server=server)
-    channel = transport.accept(30)
-    if channel is None:
-        return
-
-    shell = ShellHandler(channel, serverLogs, clientAddr)
-    shell.input_loop()
+    while True:
+        clientSocket, clientAddr = serverSocket.accept()
+        newThread = threading.Thread(
+            target=handle_client,
+            args=(clientSocket, clientAddr, serverLogs),
+            daemon=True
+        )
+        newThread.start()
 
 
 # ===== Execution =====
